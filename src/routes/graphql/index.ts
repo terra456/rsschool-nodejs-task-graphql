@@ -21,7 +21,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
         console.log(res);
         return res;
       } catch (e) {
-        return { errors: e};
+        return { errors: e };
       }
     },
   });
