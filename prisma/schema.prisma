@@ -19,7 +19,7 @@ model User {
 }
 
 model SubscribersOnAuthors {
-  subsriber    User   @relation("subscriber", fields: [subscriberId], references: [id], onDelete: Cascade)
+  subscriber   User   @relation("subscriber", fields: [subscriberId], references: [id], onDelete: Cascade)
   subscriberId String
   author       User   @relation("author", fields: [authorId], references: [id], onDelete: Cascade)
   authorId     String
