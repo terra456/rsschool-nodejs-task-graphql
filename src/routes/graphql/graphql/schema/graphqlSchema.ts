@@ -48,7 +48,6 @@ const ProfileType = new GraphQLObjectType({
     },
     memberTypeId: {
       type: MemberTypeId,
-      resolve: resolvers.getProfileMemberTypeId,
     }
   })
 })
@@ -103,7 +102,7 @@ const Query = new GraphQLObjectType({
 
     profile: {
       type: ProfileType,
-      args: { id: { type: UUIDType }},
+      args: { id: { type: new GraphQLNonNull(UUIDType) }},
       resolve: resolvers.getProfile
     },
 
@@ -121,19 +120,19 @@ const Query = new GraphQLObjectType({
 
     user: {
       type: UserType,
-      args: { id: { type: UUIDType } },
+      args: { id: { type: new GraphQLNonNull(UUIDType) } },
       resolve: resolvers.getUser,
     },
     
     users: {
       type: new GraphQLList(UserType),
       args: { id: { type: UUIDType } },
-      resolve: resolvers.getUsers
+      resolve: resolvers.getUsers,
     },
 
     post: {
       type: PostType,
-      args: { id: { type: UUIDType } },
+      args: { id: { type: new GraphQLNonNull(UUIDType) } },
       resolve: resolvers.getPost
     },
 

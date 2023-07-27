@@ -1,14 +1,55 @@
 import { PrismaClient } from "@prisma/client";
 import { MemberEnumT, NewPostT, NewProfileT, NewUserT, PostT, ProfileT, userT } from "./types.js";
 import { GraphQLError } from "graphql";
+import DataLoader from "dataloader";
 
 const prisma = new PrismaClient();
 
+async function userBatchFunction(keys: readonly string[]) {
+  const result = async (key: string) => {
+        const user = await prisma.user.findUnique({
+          where: {
+            id: key,
+          },
+        });
+        return user;
+      }
+  return keys.map(async (key: string) => await result(key) || null);
+}
+
+const userLoader = new DataLoader(userBatchFunction);
+
+async function postsBatchFunction(keys: readonly string[]) {
+  const result = async (key: string) => {
+    const posts = await prisma.post.findMany({
+      where: {
+        authorId: key,
+      },
+    });
+    return posts;
+  }
+  return keys.map(async (key: string) => await result(key) || null);
+}
+
+const postsLoader = new DataLoader(postsBatchFunction);
+
+async function memberTypeBatchFunction(keys: readonly string[]) {
+  const result = async (key: string) => {
+    const memberType = await prisma.memberType.findUnique({
+      where: {
+        id: key,
+      },
+    });
+    return memberType;
+  }
+  return keys.map(async (key: string) => await result(key) || new Error(`No result for ${key}`));
+}
+
+const memberTypeLoader = new DataLoader(memberTypeBatchFunction);
+
+
 const resolvers = {
     getProfile: async (_parent, args: {id: string}) => {
-      if (!args.id) {
-        throw new GraphQLError(`No ID passed`);
-      }
       const profile = await prisma.profile.findUnique({
         where: {
           id: args.id,
@@ -18,17 +59,7 @@ const resolvers = {
     },
   
     getProfileMemberType: async (parent: ProfileT) => {
-      const memberType = await prisma.memberType.findUnique({
-        where: { id: parent.memberTypeId },
-      });
-      return memberType;
-    },
-
-    getProfileMemberTypeId: async (parent: ProfileT) => {
-      const memberType = await prisma.memberType.findUnique({
-        where: { id: parent.memberTypeId },
-      });
-      return memberType;
+      return memberTypeLoader.load(parent.memberTypeId);
     },
   
     getProfiles: async () =>{
@@ -45,10 +76,7 @@ const resolvers = {
     },
 
     getUserPosts: async (parent: userT) => {
-      const post = await prisma.post.findMany({
-        where: { authorId: parent.id },
-      });
-      return post;
+      return postsLoader.load(parent.id);
     },
 
     getUserSubscribedTo:async (parent: userT) => {
@@ -57,15 +85,10 @@ const resolvers = {
           subscriberId: parent.id,
         },
       });
-      const users = authors.map(async (author) => {
-        const user = await prisma.user.findUnique({
-          where: {
-            id: author.authorId,
-          },
-        });
-        return user;
-      }).filter((el) => el !== null);
-      return users;
+      const authorsID = authors.map(({authorId}) => {
+        return authorId;
+      });
+      return userLoader.loadMany(authorsID);
     },
 
     getSubscribedToUser: async (parent: userT) => {
@@ -74,36 +97,16 @@ const resolvers = {
           authorId: parent.id,
         },
       });
-      const users = subscribers.map(async (subscriber) => {
-        const user = await prisma.user.findUnique({
-          where: {
-            id: subscriber.subscriberId,
-          },
-        });
-        return user;
-      }).filter((el) => el !== null);
-      return users;
+      const subscribersId = subscribers.map(({subscriberId}) => subscriberId);
+      return userLoader.loadMany(subscribersId);
     },
 
     getPostAuthor: async (parent: PostT) => {
-      const user = await prisma.user.findUnique({
-        where: {
-          id: parent.authorId,
-        },
-      });
-      return user;
+      return userLoader.load(parent.authorId);
     },
 
     getMemberType: async (_parent, args: { id: MemberEnumT }) => {
-      if (!args.id) {
-        return new GraphQLError(`No ID passed`);
-      }
-      const memberType = await prisma.memberType.findUnique({
-        where: {
-          id: args.id,
-        },
-      });
-      return memberType;
+      return memberTypeLoader.load(args.id);
     },
 
     getMemberTypes: async () => {
@@ -111,15 +114,7 @@ const resolvers = {
     },
 
     getUser: async (_parent, args: {id: string}) => {
-      if (!args.id) {
-        throw new GraphQLError(`No ID passed`);
-      }
-      const user = await prisma.user.findUnique({
-        where: {
-          id: args.id,
-        },
-      });
-      return user;
+      return userLoader.load(args.id);
     },
 
     getUsers: async () => {
@@ -127,9 +122,6 @@ const resolvers = {
     },
 
     getPost: async (_parent, args: {id: string}) => {
-      if (!args.id) {
-        throw new GraphQLError(`No ID passed`);
-      }
       const post = await prisma.post.findUnique({
         where: {
           id: args.id,
